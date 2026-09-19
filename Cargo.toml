@@ -1,5 +1,5 @@
 [package]
-name = "dlr-pst-sim"
+name = "dlr-tap-regulator-sim"
 version = "1.0.0-beta"
 edition = "2024"
 rust-version = "1.93.0"
@@ -83,11 +83,11 @@ tokio = { version = "1.42", features = ["full"] }
 axum = "0.8"
 
 [lib]
-name = "dlr_pst_sim"
+name = "dlr_tap_regulator_sim"
 path = "src/app.rs"
 
 [[bin]]
-name = "dlr-pst-sim"
+name = "dlr-tap-regulator-sim"
 path = "src/main.rs"
 test = false
 required-features = [

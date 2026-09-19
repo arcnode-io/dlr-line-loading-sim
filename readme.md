@@ -1,14 +1,14 @@
-# DLR PST Sim ⚡🔄
+# DLR Tap Regulator Sim ⚡🔄
 
-![](https://img.shields.io/gitlab/pipeline-status/arcnode-io/dlr-pst-sim?branch=main&logo=gitlab)
-![](https://gitlab.com/arcnode-io/dlr-pst-sim/badges/main/coverage.svg)
+![](https://img.shields.io/gitlab/pipeline-status/arcnode-io/dlr-tap-regulator-sim?branch=main&logo=gitlab)
+![](https://gitlab.com/arcnode-io/dlr-tap-regulator-sim/badges/main/coverage.svg)
 ![](https://img.shields.io/badge/1.93-gray?logo=rust)
 ![](https://img.shields.io/badge/esp32--c3-gray?logo=espressif)
 ![](https://img.shields.io/badge/mqtt-gray?logo=mqtt)
 
 > ESP32-C3 firmware (Embassy async runtime): publishes temperature telemetry
 > over MQTT, subscribes to the DLR dynamic line rating from
-> `dlr-operating-envelope`, and runs a software tap-position control loop
+> `dlr-rtu-firmware`, and runs a software tap-position control loop
 > that decides + publishes a transformer tap decision. Physical relay/
 > transformer actuation is not wired up yet — see [Current Scope](#current-scope).
 
@@ -95,13 +95,13 @@ gpio5 --> relay4 --> tap4
 | Direction | Topic | Payload |
 |---|---|---|
 | Publish | `test/temp/F` | raw float string |
-| Subscribe | `test/line_rating/A` | raw float string — matches `dlr-operating-envelope/src/mqtt.py::MQTT_TOPIC` as published today |
+| Subscribe | `test/line_rating/A` | raw float string — matches `dlr-rtu-firmware/src/mqtt.py::MQTT_TOPIC` as published today |
 | Publish | `test/tap_position` | tap label string (`TAP_1`..`TAP_4`) |
 
 **Target contract** per [ems/topic_structure_adr.md](../ems/topic_structure_adr.md)
 (`FloatSample {ts, value}` / `EnumSample {ts, value}`) — documented as the
 destination, not yet implemented on either this repo or
-`dlr-operating-envelope`'s publish side:
+`dlr-rtu-firmware`'s publish side:
 
 - `sites/{site_id}/devices/{dlr_device_id}/measurements/dynamic_rating/amps`
 - `sites/{site_id}/devices/{device_id}/commands/set/tap_position/none` — `EnumSample`
@@ -110,7 +110,7 @@ destination, not yet implemented on either this repo or
 - `sites/{site_id}/devices/{device_id}/measurements/status/none` — `EnumSample`, LWT-backed
 
 Migrating both repos to the ADR topic/payload contract is tracked as a
-follow-up — it touches `dlr-operating-envelope`'s currently-green
+follow-up — it touches `dlr-rtu-firmware`'s currently-green
 hardware-in-loop pipeline, so it gets its own change.
 
 ## Tap Control Logic
@@ -122,7 +122,7 @@ hardware-in-loop pipeline, so it gets its own change.
 - Gradual adjustments (one tap position per tick) to prevent voltage spikes
 
 Band edges are derived from the actual IEEE 738 output range
-`dlr-operating-envelope`'s sim sensors produce over one sawtooth-sweep
+`dlr-rtu-firmware`'s sim sensors produce over one sawtooth-sweep
 cycle for the DRAKE_ACSR_795 conductor, not arbitrary guesses — see the
 doc comment in `src/tap_control.rs`.
 
@@ -162,7 +162,7 @@ doc comment in `src/tap_control.rs`.
 
 ```bash
 # Build + flash firmware
-cargo build --bin=dlr-pst-sim --release
+cargo build --bin=dlr-tap-regulator-sim --release
 
 # Run on-device integration tests
 cargo cmd integration

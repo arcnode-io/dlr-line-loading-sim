@@ -8,7 +8,7 @@ use std::process::Command;
 const RELEASE_FEATURES: &str = "defmt,esp-hal,embassy-time,esp-hal-embassy,rtt-target,esp-alloc,embassy-executor,embassy-net,esp-bootloader-esp-idf,critical-section,esp-wifi,smoltcp,static_cell,rust-mqtt,heapless,shtcx,embedded-hal";
 
 /// Path to the built release binary, relative to the crate root.
-pub const RELEASE_BIN_PATH: &str = "target/riscv32imc-unknown-none-elf/release/dlr-pst-sim";
+pub const RELEASE_BIN_PATH: &str = "target/riscv32imc-unknown-none-elf/release/dlr-tap-regulator-sim";
 
 /// Finds this machine's LAN IP the way the device would reach it -- the
 /// route the OS picks toward a public address, not `cfg.yml`'s value (which
@@ -29,7 +29,7 @@ pub fn build_release_firmware(mqtt_port: u16) -> Result<(), Box<dyn Error>> {
     let status = Command::new("cargo")
         .arg("build")
         .arg("--release")
-        .arg("--bin=dlr-pst-sim")
+        .arg("--bin=dlr-tap-regulator-sim")
         .arg(format!("--features={RELEASE_FEATURES}"))
         .env("MQTT_HOST", mqtt_host)
         .env("MQTT_PORT", mqtt_port.to_string())

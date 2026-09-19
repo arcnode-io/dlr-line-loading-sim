@@ -1,4 +1,4 @@
-//! Application library for dlr-pst-sim.
+//! Application library for dlr-tap-regulator-sim.
 //!
 //! This library provides temperature monitoring and publishing.
 

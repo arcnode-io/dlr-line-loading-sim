@@ -27,6 +27,6 @@ mirror:
     GIT_DEPTH: 0
   script:
     - git checkout -B main
-    - git push --mirror git@github.com:arcnode-io/dlr-pst-sim.git
+    - git push --mirror git@github.com:arcnode-io/dlr-tap-regulator-sim.git
   only:
     - main
