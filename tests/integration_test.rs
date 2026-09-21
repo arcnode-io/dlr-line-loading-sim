@@ -43,7 +43,8 @@ mod integration_tests {
             .with_sda(peripherals.GPIO10)
             .with_scl(peripherals.GPIO8);
 
-        let mut client = dlr_tap_regulator_sim::temperature::temperature_client::TemperatureClient::new(i2c);
+        let mut client =
+            dlr_tap_regulator_sim::temperature::temperature_client::TemperatureClient::new(i2c);
 
         // Act - Read temperature
         let fahrenheit = client.read_fahrenheit();

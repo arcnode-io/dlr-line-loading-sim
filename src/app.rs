@@ -4,8 +4,24 @@
 
 #![cfg_attr(not(test), no_std)]
 
+#[cfg(test)]
+#[path = "app_test.rs"]
+mod app_test;
+
 #[cfg(all(feature = "shtcx", feature = "rust-mqtt", feature = "embassy-net"))]
 use crate::temperature::temperature_client::TemperatureClient;
+
+/// Synthetic line-loading value (amps) -- placeholder until the PZEM-004T
+/// current-transformer module lands on the physical unit. Not physically
+/// meaningful, just present and varying: a sawtooth over `loop_count`
+/// wrapping every 100A.
+// Reason: only called from `run()`, which is gated behind hardware features --
+// unused (and flagged dead_code) under the plain `--no-default-features`
+// unit-test build.
+#[allow(dead_code)]
+fn synthetic_line_loading_a(loop_count: u32) -> f64 {
+    (loop_count % 100) as f64
+}
 
 /// MQTT client for publishing sensor data.
 pub mod mqtt;
@@ -46,7 +62,7 @@ pub async fn run<I2C>(i2c: I2C, stack: &'static embassy_net::Stack<'static>) -> 
 where
     I2C: embedded_hal::i2c::I2c,
 {
-    use crate::mqtt::{MQTT_TOPIC, Mqtt, RATING_TOPIC, TAP_POSITION_TOPIC};
+    use crate::mqtt::{LINE_LOADING_TOPIC, MQTT_TOPIC, Mqtt, RATING_TOPIC, TAP_POSITION_TOPIC};
     use crate::tap_control::TapController;
     use defmt::info;
     use embassy_time::{Duration, Timer};
@@ -80,6 +96,14 @@ where
             info!("Loop #{}: Temperature = {}F", loop_count, temp_f);
 
             if !mqtt_client.publish(MQTT_TOPIC, temp_f).await {
+                break; // connection broken -- reconnect
+            }
+
+            let line_loading_a = synthetic_line_loading_a(loop_count);
+            if !mqtt_client
+                .publish(LINE_LOADING_TOPIC, line_loading_a)
+                .await
+            {
                 break; // connection broken -- reconnect
             }
 

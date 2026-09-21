@@ -19,6 +19,16 @@ pub const RATING_TOPIC: &str = "test/line_rating/A";
 /// convention as `RATING_TOPIC` -- see its docs.
 pub const TAP_POSITION_TOPIC: &str = "test/tap_position";
 
+/// MQTT topic for publishing a synthetic line-loading value (amps).
+///
+/// Placeholder until the PZEM-004T + CT module lands on the physical unit --
+/// value is synthetic, not a real measurement (see `app::synthetic_line_loading_a`).
+/// Bare-topic convention, not ADR-002 shape: this whole subsystem (`mock_derms`
+/// in ems/readme.md's deployment diagram) is bounded off from the real ems/
+/// device-template contract, so there's no cross-project consistency reason
+/// pulling this topic toward that shape.
+pub const LINE_LOADING_TOPIC: &str = "test/line_loading/A";
+
 /// Marker error: the MQTT connection is broken. Caller should stop using
 /// this client and reconnect via `Mqtt::init`.
 #[derive(Debug)]
