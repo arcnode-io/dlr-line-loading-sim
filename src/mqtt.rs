@@ -2,23 +2,6 @@
 //!
 //! Uses rust-mqtt for no_std async MQTT v5 client.
 
-/// MQTT topic for publishing temperature readings.
-pub const MQTT_TOPIC: &str = "test/temp/F";
-
-/// MQTT topic to subscribe to for the DLR dynamic line rating (amps).
-///
-/// Matches `dlr-operating-envelope/src/mqtt.py::MQTT_TOPIC` as it is
-/// published today. Provisional: both repos' readmes document the
-/// ADR-002 (`ems/topic_structure_adr.md`) contract
-/// (`sites/{site_id}/devices/{device_id}/measurements/dynamic_rating/amps`,
-/// `FloatSample {ts, value}`), but neither side's code implements it yet.
-/// Migrating this topic name is out of scope here -- tracked as a follow-up.
-pub const RATING_TOPIC: &str = "test/line_rating/A";
-
-/// MQTT topic for publishing the tap-position decision. Same provisional
-/// convention as `RATING_TOPIC` -- see its docs.
-pub const TAP_POSITION_TOPIC: &str = "test/tap_position";
-
 /// MQTT topic for publishing a synthetic line-loading value (amps).
 ///
 /// Placeholder until the PZEM-004T + CT module lands on the physical unit --
@@ -28,11 +11,6 @@ pub const TAP_POSITION_TOPIC: &str = "test/tap_position";
 /// device-template contract, so there's no cross-project consistency reason
 /// pulling this topic toward that shape.
 pub const LINE_LOADING_TOPIC: &str = "test/line_loading/A";
-
-/// Marker error: the MQTT connection is broken. Caller should stop using
-/// this client and reconnect via `Mqtt::init`.
-#[derive(Debug)]
-pub struct ConnectionLost;
 
 #[cfg(feature = "rust-mqtt")]
 use core::fmt::Write;
@@ -185,84 +163,5 @@ impl<'a> Mqtt<'a> {
                 false
             }
         }
-    }
-
-    /// Publish a string value (e.g. an EnumSample label) to the specified topic.
-    ///
-    /// # Arguments
-    /// * `topic` - MQTT topic to publish to
-    /// * `value` - String payload to publish verbatim
-    ///
-    /// # Returns
-    /// `true` on success. `false` means the connection is broken -- the
-    /// caller should stop using this client and reconnect via `init`.
-    pub async fn publish_str(&mut self, topic: &str, value: &str) -> bool {
-        #[cfg(feature = "defmt")]
-        defmt::info!("📤 Publishing to topic '{}': '{}'", topic, value);
-
-        match self
-            .client
-            .send_message(topic, value.as_bytes(), QualityOfService::QoS0, false)
-            .await
-        {
-            Ok(_) => {
-                #[cfg(feature = "defmt")]
-                defmt::info!("✅ Message published successfully");
-                true
-            }
-            Err(e) => {
-                #[cfg(feature = "defmt")]
-                defmt::info!("❌ Failed to publish message: {:?}", e);
-                false
-            }
-        }
-    }
-
-    /// Subscribe to a topic. Call once after `init()`, before the first
-    /// `try_receive_rating` call.
-    ///
-    /// # Arguments
-    /// * `topic` - MQTT topic to subscribe to
-    ///
-    /// # Returns
-    /// `true` on success. `false` means the connection is broken -- the
-    /// caller should stop using this client and reconnect via `init`.
-    pub async fn subscribe(&mut self, topic: &str) -> bool {
-        match self.client.subscribe_to_topic(topic).await {
-            Ok(()) => {
-                #[cfg(feature = "defmt")]
-                defmt::info!("✅ Subscribed to topic '{}'", topic);
-                true
-            }
-            Err(e) => {
-                #[cfg(feature = "defmt")]
-                defmt::info!("❌ Failed to subscribe to '{}': {:?}", topic, e);
-                false
-            }
-        }
-    }
-
-    /// Poll for a pending subscribed message without blocking the caller.
-    ///
-    /// # Returns
-    /// `Ok(Some(value))` when a message was ready and decoded as a float.
-    /// `Ok(None)` when nothing is pending, or a ready payload didn't decode
-    /// (not UTF-8 / not a number) -- both are non-fatal, keep looping.
-    /// `Err(())` means the connection is broken -- the caller should stop
-    /// using this client and reconnect via `init`.
-    pub async fn try_receive_rating(&mut self) -> Result<Option<f64>, ConnectionLost> {
-        let (_topic, payload) = match self.client.receive_message_if_ready().await {
-            Ok(Some(msg)) => msg,
-            Ok(None) => return Ok(None),
-            Err(e) => {
-                #[cfg(feature = "defmt")]
-                defmt::info!("❌ Failed to poll for subscribed message: {:?}", e);
-                return Err(ConnectionLost);
-            }
-        };
-
-        Ok(core::str::from_utf8(payload)
-            .ok()
-            .and_then(|s| s.trim().parse().ok()))
     }
 }

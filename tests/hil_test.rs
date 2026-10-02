@@ -1,8 +1,7 @@
 //! Hardware-in-Loop tests for ESP32 firmware.
 //!
 //! Tests include:
-//! - MQTT integration: temperature sensor publishes to MQTT broker
-//! - Tap control: device reacts to a published DLR rating with a tap decision
+//! - MQTT integration: device publishes line loading to MQTT broker
 
 mod fixtures;
 
@@ -17,18 +16,8 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 
-/// Topic where temperature readings are published.
-const TEMP_TOPIC: &str = "test/temp/F";
-
-/// Topic the test publishes a synthetic DLR rating to.
-const RATING_TOPIC: &str = "test/line_rating/A";
-
-/// Topic the device publishes its tap-position decision to.
-const TAP_POSITION_TOPIC: &str = "test/tap_position";
-
-/// A rating that unambiguously targets Tap1 in `tap_control`'s bands, so a
-/// fresh device (starting at Tap4) takes exactly one step to Tap3.
-const HIGH_RATING_A: &str = "2500.0";
+/// Topic where line loading (amps) is published.
+const LINE_LOADING_TOPIC: &str = "test/line_loading/A";
 
 /// Maximum time to wait for MQTT message (in seconds).
 const MQTT_TIMEOUT_SECS: u64 = 80;
@@ -101,56 +90,26 @@ async fn test_hil_mqtt_integration() -> Result<(), Box<dyn Error>> {
     let mqttoptions = MqttOptions::new("hil_test_client", "localhost", broker.port);
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
     // Subscribe BEFORE flashing so we don't miss the first message.
-    client.subscribe(TEMP_TOPIC, QoS::AtLeastOnce).await?;
+    client
+        .subscribe(LINE_LOADING_TOPIC, QoS::AtLeastOnce)
+        .await?;
 
     // Act
     flash_firmware(start)?;
     let payload = wait_for_publish_payload(&mut eventloop, start).await?;
 
-    // Assert
-    let temp_f: f32 = payload
+    // Assert -- synthetic_line_loading_a is a sawtooth in [0, 100).
+    let line_loading_a: f32 = payload
         .parse()
         .map_err(|_| "Payload is not a valid float")?;
     assert!(
-        (50.0..=104.0).contains(&temp_f),
-        "Temperature {temp_f} is outside reasonable range"
+        (0.0..100.0).contains(&line_loading_a),
+        "line_loading {line_loading_a}A outside the synthetic sawtooth's range"
     );
     println!(
-        "[{:.1}s] SUCCESS: valid temperature {}F",
+        "[{:.1}s] SUCCESS: valid line_loading {}A",
         start.elapsed().as_secs_f32(),
-        temp_f
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_hil_tap_position_reacts_to_rating() -> Result<(), Box<dyn Error>> {
-    let start = Instant::now();
-
-    // Arrange
-    let broker = arrange_broker_and_firmware(start).await?;
-    let mqttoptions = MqttOptions::new("hil_tap_test_client", "localhost", broker.port);
-    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
-    // Publish the synthetic rating retained, BEFORE the device subscribes --
-    // retain guarantees delivery regardless of subscribe-vs-publish ordering.
-    client
-        .publish(RATING_TOPIC, QoS::AtLeastOnce, true, HIGH_RATING_A)
-        .await?;
-    client
-        .subscribe(TAP_POSITION_TOPIC, QoS::AtLeastOnce)
-        .await?;
-
-    // Act
-    flash_firmware(start)?;
-    let payload = wait_for_publish_payload(&mut eventloop, start).await?;
-
-    // Assert -- first tick only steps one position from the conservative
-    // start (Tap4) toward the target the rating implies (Tap1).
-    assert_eq!(payload, "TAP_3", "expected one step from Tap4 toward Tap1");
-    println!(
-        "[{:.1}s] SUCCESS: device reacted with {}",
-        start.elapsed().as_secs_f32(),
-        payload
+        line_loading_a
     );
     Ok(())
 }

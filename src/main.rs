@@ -36,14 +36,6 @@ async fn main(spawner: Spawner) {
     let stack = dlr_line_loading_sim::network::setup_network(&spawner, peripherals).await;
     info!("WiFi connected!");
 
-    // Reason: setup_network consumes peripherals, steal back for I2C (GPIO10/GPIO8 unused by WiFi)
-    let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
-    let i2c =
-        esp_hal::i2c::master::I2c::new(peripherals.I2C0, esp_hal::i2c::master::Config::default())
-            .unwrap()
-            .with_sda(peripherals.GPIO10)
-            .with_scl(peripherals.GPIO8);
-
-    info!("Hardware initialized. Starting application...");
-    dlr_line_loading_sim::run(i2c, stack).await.ok();
+    info!("Starting application...");
+    dlr_line_loading_sim::run(stack).await.ok();
 }

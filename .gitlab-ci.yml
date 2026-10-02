@@ -9,7 +9,6 @@ check:
     - cargo nextest run --lib --no-default-features --profile ci --cargo-profile dev --target x86_64-unknown-linux-gnu
     - cargo tarpaulin --skip-clean --lib --no-default-features --target x86_64-unknown-linux-gnu --exclude-files=src/main.rs --target-dir=target/coverage --out Xml
     - cargo cmd healthcheck
-    - cargo cmd integration
     - cargo cmd hardware-in-loop
   coverage: '/^\d+.\d+% coverage/'
   artifacts:

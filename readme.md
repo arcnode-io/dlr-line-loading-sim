@@ -6,28 +6,43 @@
 ![](https://img.shields.io/badge/esp32--c3-gray?logo=espressif)
 ![](https://img.shields.io/badge/mqtt-gray?logo=mqtt)
 
-> ESP32-C3 firmware (Embassy async runtime): publishes temperature telemetry
-> over MQTT, subscribes to the DLR dynamic line rating from
-> `dlr-rtu-firmware`, and runs a software tap-position control loop
-> that decides + publishes a transformer tap decision. Physical relay/
-> transformer actuation is not wired up yet — see [Current Scope](#current-scope).
+> ESP32-C3 firmware (Embassy async runtime): reads line current loading from
+> a PZEM-004T-100A AC energy meter and publishes it over MQTT for
+> `mock-derms-dispatch-api`'s curtailment trigger. Today the reading is a
+> synthetic placeholder; real PZEM-004T hardware integration is the next
+> step -- see [Current Scope](#current-scope).
+
+## Scope
+
+This repo used to also run a DLR-rating-reactive voltage-regulator control
+loop (tap position derived from `dlr-rtu-firmware`'s live rating). That's
+gone, deliberately: real line regulators use line-drop compensation (local
+voltage + current sensing against a configured line-impedance model), not a
+remote thermal ampacity rating, to decide tap position -- the two are
+unrelated physical quantities. And per `ems/readme.md`'s DER Event diagram,
+the product's actual DER-dispatch chain (`dlr_rtu -> dispatch_api ->
+der_control_api -> industrial_gateway -> bess_module`) never routes through
+a tap-changer at all; it was a dead-end branch that received data and did
+nothing with it downstream. What's left, and all that's needed, is the line
+loading measurement itself.
 
 ## Current Scope
 
 **Built + tested today:**
 - Real WiFi (esp-wifi/embassy-net) + real MQTT v5 (rust-mqtt, no_std) on the ESP32-C3.
-- Publishes an I2C temperature reading (°F) every tick.
-- Subscribes to the DLR dynamic line rating; a pure, unit-tested state
-  machine (`src/tap_control.rs`) maps the rating to one of 4 tap positions
-  and steps toward it gradually (one position per tick, to avoid voltage
-  spikes) — see [Tap Control Logic](#tap-control-logic).
-- Publishes the resulting tap-position decision over MQTT.
+- Publishes a synthetic line-loading reading (amps) every tick to
+  `test/line_loading/A` -- a deterministic sawtooth, not physically
+  meaningful, placeholder until the PZEM-004T module lands (see
+  `src/app.rs::synthetic_line_loading_a`).
 - Hardware-in-loop test (`tests/hil_test.rs`) flashes real firmware to a
-  physical ESP32-C3 and verifies the MQTT round-trip on real hardware.
+  physical ESP32-C3 and verifies the MQTT publish round-trip on real hardware.
 
-**Not built yet (no relay/transformer hardware on hand):**
-- No GPIO relay actuation — the tap-position decision is computed and
-  published, not physically applied to a transformer.
+**Not built yet (PZEM-004T hardware on order, not here):**
+- No real PZEM-004T read -- Modbus-RTU over UART, see [PZEM Wiring](#pzem-wiring-planned).
+- No on-device integration test for the PZEM read (the `embedded-test`
+  harness that powered the old temperature-sensor integration test is still
+  wired up in `build.rs`; a new PZEM integration test will use it once
+  hardware arrives).
 - No OTA firmware update path.
 
 ## Pre-requisites
@@ -35,137 +50,93 @@
 - rust 1.93+
 - probe-rs (`cargo install probe-rs-tools`)
 - ESP32-C3 development board
-- I2C temperature sensor (shtcx-compatible)
-
-**For the future physical tap-actuation phase (not required today):**
-- 4-channel relay module
-- Multi-tap transformer
+- PZEM-004T-100A AC energy meter module + CT clamp (for the PZEM integration phase)
 
 ## Hardware
 
 | Component | Purpose | Interface | Status |
 |---|---|---|---|
 | ESP32-C3 | Microcontroller | WiFi + MQTT | Built |
-| I2C temp sensor | Telemetry source | I2C | Built |
-| 4-Channel Relay | Tap switching | GPIO | Not wired — no hardware on hand |
-| Multi-tap Transformer | Voltage adjustment | AC | Not wired — no hardware on hand |
+| PZEM-004T-100A | Line loading sensor (V/I/PF) | UART (Modbus-RTU, 9600 8N1) | Not wired -- hardware on order |
 
-## Pinout (target — not yet wired)
+## PZEM Wiring (planned)
 
-The relay/transformer wiring below is the intended physical actuation
-layer once that hardware is sourced. Today the firmware computes and
-publishes a tap decision but drives no GPIOs for it.
+PZEM-004T's TTL header is 5V logic; ESP32-C3 GPIO is 3.3V-max, so the PZEM
+-> ESP32 direction needs a level shift (a simple resistor divider is enough
+-- ESP32 -> PZEM at 3.3V reads fine as logic-high without one).
 
 ```mermaid
 flowchart LR
 classDef default fill:transparent,stroke:#333
 
 subgraph esp32_c3
-  gpio2
-  gpio3
-  gpio4
-  gpio5
-  wifi
+  gpio4["GPIO4 (TX)"]
+  gpio5["GPIO5 (RX)"]
+  gnd1["GND"]
 end
 
-subgraph relay_module [4-channel relay]
-  relay1
-  relay2
-  relay3
-  relay4
+subgraph divider [resistor divider]
+  r1["1k"]
+  r2["2k"]
 end
 
-subgraph transformer [multi-tap xfmr]
-  tap1
-  tap2
-  tap3
-  tap4
+subgraph pzem [PZEM-004T-100A TTL header]
+  tx["TX (5V logic)"]
+  rx["RX"]
+  gnd2["GND"]
+  v5["5V (separate supply)"]
 end
 
-gpio2 --> relay1 --> tap1
-gpio3 --> relay2 --> tap2
-gpio4 --> relay3 --> tap3
-gpio5 --> relay4 --> tap4
+gpio4 --> rx
+tx --> r1 --> r2 --> gpio5
+gnd1 --- gnd2
 ```
+
+PZEM's `5V` pin needs its own supply (not the ESP32's 3.3V rail). The
+mains-side L/N + CT clamp wiring is a separate, higher-stakes concern --
+see the PZEM-004T V3.0 datasheet's own wiring diagrams before touching it.
 
 ## MQTT Topics
 
-**Current (provisional, matches what's actually on the wire today):**
-
 | Direction | Topic | Payload |
 |---|---|---|
-| Publish | `test/temp/F` | raw float string |
-| Subscribe | `test/line_rating/A` | raw float string — matches `dlr-rtu-firmware/src/mqtt.py::MQTT_TOPIC` as published today |
-| Publish | `test/tap_position` | tap label string (`TAP_1`..`TAP_4`) |
+| Publish | `test/line_loading/A` | raw float string (amps) |
 
-**Target contract** per [ems/topic_structure_adr.md](../ems/topic_structure_adr.md)
-(`FloatSample {ts, value}` / `EnumSample {ts, value}`) — documented as the
-destination, not yet implemented on either this repo or
-`dlr-rtu-firmware`'s publish side:
-
-- `sites/{site_id}/devices/{dlr_device_id}/measurements/dynamic_rating/amps`
-- `sites/{site_id}/devices/{device_id}/commands/set/tap_position/none` — `EnumSample`
-- `sites/{site_id}/devices/{device_id}/measurements/output_voltage/volts`
-- `sites/{site_id}/devices/{device_id}/measurements/tap_position/none` — `EnumSample`
-- `sites/{site_id}/devices/{device_id}/measurements/status/none` — `EnumSample`, LWT-backed
-
-Migrating both repos to the ADR topic/payload contract is tracked as a
-follow-up — it touches `dlr-rtu-firmware`'s currently-green
-hardware-in-loop pipeline, so it gets its own change.
-
-## Tap Control Logic
-
-`src/tap_control.rs` maps the dynamic rating to a tap position:
-
-- Higher rating → lower tap (higher voltage)
-- Lower rating → higher tap (lower voltage)
-- Gradual adjustments (one tap position per tick) to prevent voltage spikes
-
-Band edges are derived from the actual IEEE 738 output range
-`dlr-rtu-firmware`'s sim sensors produce over one sawtooth-sweep
-cycle for the DRAKE_ACSR_795 conductor, not arbitrary guesses — see the
-doc comment in `src/tap_control.rs`.
+Bare-topic convention, not ADR-002 shape, deliberately: this whole subsystem
+(`mock_derms` in `ems/readme.md`'s deployment diagram -- this repo, `dlr_rtu`,
+and `dispatch_api`) is bounded off from the real `ems`/device-template
+contract, with no cross-project consistency reason to force that shape here.
+See `src/mqtt.rs::LINE_LOADING_TOPIC` for the full citation.
 
 ## Project Structure
 
 ```
 ├── Cargo.toml                      # package, features, target config
 ├── rust-toolchain.toml             # pinned 1.98.0
-├── build.rs                        # compile-time cfg.yml baking
+├── build.rs                        # compile-time cfg.yml baking + embedded-test linker setup
 ├── cfg.yml                         # wifi_ssid, mqtt_host per env
 ├── .cargo/config.toml               # probe-rs runner + target
 ├── src/
 │   ├── main.rs                     # entry point
-│   ├── app.rs                      # library — embassy tasks + main loop
+│   ├── app.rs                      # library -- embassy tasks + main loop
+│   ├── app_test.rs                 # unit tests (host, no hardware)
 │   ├── network.rs                  # WiFi + embassy-net setup
-│   ├── mqtt.rs                     # MQTT pub/sub client
-│   ├── tap_control.rs              # rating -> tap-position state machine
-│   ├── tap_control_test.rs         # unit tests (host, no hardware)
-│   └── temperature/
-│       ├── mod.rs
-│       ├── temperature_client.rs
-│       ├── temperature_client_test.rs
-│       └── temperature_driver.rs
+│   └── mqtt.rs                     # MQTT publish client
 └── tests/
-    ├── integration_test.rs         # on-device embedded-test suite
-    ├── hil_test.rs                 # flash firmware + verify MQTT round-trip
-    └── fixtures/                   # testcontainer helpers
+    ├── hil_test.rs                 # flash firmware + verify MQTT publish round-trip
+    └── fixtures/                   # testcontainer + flash helpers
 ```
 
 ### Testing Strategy
 
-1. **Unit** — `*_test.rs` colocated per module, run on host via `cargo cmd unit`
-2. **Integration** — `integration_test.rs` runs on-device via embedded-test + probe-rs
-3. **Hardware-in-loop** — `hil_test.rs` flashes firmware, starts a testcontainer MQTT broker, verifies the subscribe/publish loop on real hardware
+1. **Unit** -- `*_test.rs` colocated per module, run on host via `cargo cmd unit`
+2. **Hardware-in-loop** -- `hil_test.rs` flashes firmware, starts a testcontainer MQTT broker, verifies the publish round-trip on real hardware
 
 ## Usage
 
 ```bash
 # Build + flash firmware
 cargo build --bin=dlr-line-loading-sim --release
-
-# Run on-device integration tests
-cargo cmd integration
 
 # Run hardware-in-loop tests (requires device on USB + testcontainers)
 cargo cmd hardware-in-loop

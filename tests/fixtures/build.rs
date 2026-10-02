@@ -5,7 +5,7 @@ use std::net::UdpSocket;
 use std::process::Command;
 
 /// Full feature set required to build the production firmware binary.
-const RELEASE_FEATURES: &str = "defmt,esp-hal,embassy-time,esp-hal-embassy,rtt-target,esp-alloc,embassy-executor,embassy-net,esp-bootloader-esp-idf,critical-section,esp-wifi,smoltcp,static_cell,rust-mqtt,heapless,shtcx,embedded-hal";
+const RELEASE_FEATURES: &str = "defmt,esp-hal,embassy-time,esp-hal-embassy,rtt-target,esp-alloc,embassy-executor,embassy-net,esp-bootloader-esp-idf,critical-section,esp-wifi,smoltcp,static_cell,rust-mqtt,heapless";
 
 /// Path to the built release binary, relative to the crate root.
 pub const RELEASE_BIN_PATH: &str =

@@ -520,7 +520,6 @@ dependencies = [
  "embassy-executor",
  "embassy-net",
  "embassy-time",
- "embedded-hal 1.0.0",
  "embedded-test",
  "esp-alloc",
  "esp-bootloader-esp-idf",
@@ -533,7 +532,6 @@ dependencies = [
  "rust-mqtt",
  "serde",
  "serde_yaml",
- "shtcx",
  "smoltcp",
  "static_cell",
  "testcontainers",
@@ -2655,15 +2653,6 @@ name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
-
-[[package]]
-name = "shtcx"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c25d66e6c78c6e19160a5b528cebe6f54d5737f091a2b90b08dbd7e63a9269f"
-dependencies = [
- "embedded-hal 1.0.0",
-]
 
 [[package]]
 name = "signal-hook-registry"
