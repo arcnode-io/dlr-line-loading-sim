@@ -9,11 +9,11 @@ const RELEASE_FEATURES: &str = "defmt,esp-hal,embassy-time,esp-hal-embassy,rtt-t
 
 /// Path to the built release binary, relative to the crate root.
 pub const RELEASE_BIN_PATH: &str =
-    "target/riscv32imc-unknown-none-elf/release/dlr-tap-regulator-sim";
+    "target/riscv32imc-unknown-none-elf/release/dlr-line-loading-sim";
 
 /// Finds this machine's LAN IP the way the device would reach it -- the
 /// route the OS picks toward a public address, not `cfg.yml`'s value (which
-/// drifts with DHCP). Same trick `dlr-operating-envelope/tests/test_hil.py`
+/// drifts with DHCP). Same trick `dlr-rtu-firmware/tests/test_hil.py`
 /// uses. No packets actually leave the machine (UDP connect just picks a route).
 fn local_lan_ip() -> Result<String, Box<dyn Error>> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
@@ -30,7 +30,7 @@ pub fn build_release_firmware(mqtt_port: u16) -> Result<(), Box<dyn Error>> {
     let status = Command::new("cargo")
         .arg("build")
         .arg("--release")
-        .arg("--bin=dlr-tap-regulator-sim")
+        .arg("--bin=dlr-line-loading-sim")
         .arg(format!("--features={RELEASE_FEATURES}"))
         .env("MQTT_HOST", mqtt_host)
         .env("MQTT_PORT", mqtt_port.to_string())

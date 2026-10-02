@@ -1,7 +1,7 @@
-# DLR Tap Regulator Sim ⚡🔄
+# DLR Line Loading Sim ⚡🔄
 
-![](https://img.shields.io/gitlab/pipeline-status/arcnode-io/dlr-tap-regulator-sim?branch=main&logo=gitlab)
-![](https://gitlab.com/arcnode-io/dlr-tap-regulator-sim/badges/main/coverage.svg)
+![](https://img.shields.io/gitlab/pipeline-status/arcnode-io/dlr-line-loading-sim?branch=main&logo=gitlab)
+![](https://gitlab.com/arcnode-io/dlr-line-loading-sim/badges/main/coverage.svg)
 ![](https://img.shields.io/badge/1.93-gray?logo=rust)
 ![](https://img.shields.io/badge/esp32--c3-gray?logo=espressif)
 ![](https://img.shields.io/badge/mqtt-gray?logo=mqtt)
@@ -162,7 +162,7 @@ doc comment in `src/tap_control.rs`.
 
 ```bash
 # Build + flash firmware
-cargo build --bin=dlr-tap-regulator-sim --release
+cargo build --bin=dlr-line-loading-sim --release
 
 # Run on-device integration tests
 cargo cmd integration

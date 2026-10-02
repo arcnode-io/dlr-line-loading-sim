@@ -511,7 +511,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dlr-tap-regulator-sim"
+name = "dlr-line-loading-sim"
 version = "1.0.0-beta"
 dependencies = [
  "axum",
